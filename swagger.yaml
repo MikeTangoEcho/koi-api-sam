@@ -1,0 +1,127 @@
+swagger: "2.0"
+info:
+  description: "KoiApi, Chat everywhere"
+  version: "1.0.0"
+  title: "KoiApi"
+  contact:
+    email: "koi@ducksdream.com"
+basePath: /Dev
+tags:
+  - name: "chat"
+    description: "Chat"
+schemes:
+  - https
+produces:
+  - application/json
+x-amazon-apigateway-request-validators:
+  basic:
+    validateRequestBody : true
+    validateRequestParameters : true
+x-amazon-apigateway-request-validator: basic
+# CORS Headers when going aws_proxy.
+# Hybrid config where we use gateway validator and keep full control of the responses
+x-amazon-apigateway-gateway-responses:
+  DEFAULT_4XX:
+    responseParameters:
+        gatewayresponse.header.Access-Control-Allow-Origin:
+          Fn::Sub: "'${CORSAllowOrigin}'"
+  DEFAULT_5XX:
+    responseParameters:
+        gatewayresponse.header.Access-Control-Allow-Origin:
+          Fn::Sub: "'${CORSAllowOrigin}'"
+paths:
+  /messages:
+    post:
+      operationId: addMessage
+      summary: Send a Message
+      # description: ""
+      consumes:
+        - application/json
+      parameters:
+        - name: message
+          in: body
+          description: Message
+          required: true
+          schema:
+            $ref: '#/definitions/NewMessage'
+      tags:
+        - "chat"
+      responses:
+        201:
+          description: "Success"
+        400:
+          description: "Bad Request"
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST        
+        uri: 
+          Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${KoiFunction.Arn}/invocations
+        responses:
+          default:
+            statusCode: 201
+        requestTemplates:
+          application/json: >
+            #set($inputRoot = $input.path('$'))
+            {
+              "place": "$root.place",
+              "content": "$root.content"
+            }
+        passthroughBehavior: never
+    get:
+      operationId: getMessages
+      summary: Retrieve last messages
+      # description: ""
+      parameters:
+        - name: place
+          in: query
+          description: Filter message by place
+          required: true
+          type: "string"
+      responses:
+        200:
+          description: "Success"
+          schema:
+            type: "array"
+            items:
+              $ref: "#/definitions/Message"
+        400:
+          description: "Bad Request"
+      tags:
+        - "chat"
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        uri:
+          Fn::Sub: "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${KoiFunction.Arn}/invocations"
+        requestParameters:
+          integration.request.querystring.place: method.request.querystring.place
+        responses:
+          default:
+            statusCode: 200
+definitions:
+  NewMessage:
+    type: object
+    properties:
+      place:
+        type: "string"
+      content:
+        type: "string"
+    required:
+      - place
+      - content
+  Message:
+    type: object
+    properties:
+      messageId:
+        type: "string"
+      place:
+        type: "string"
+      userId:
+        type: "string"
+      userName:
+        type: "string"
+      content:
+        type: "string"
+      createdAt:
+        type: "string"
+        format: "date-time"

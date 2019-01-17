@@ -1,0 +1,172 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+    sam-app
+
+    Koi Chat application
+    
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/parameters-section-structure.html
+Parameters: 
+    MessagesByPlaceTableName: 
+        Default: koiMessagesByPlace
+        Description: DynamoDB table name to store message
+        Type: String
+
+    # https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/time-to-live-ttl-before-you-start.html
+    MessageTTL:
+        Default: 604800 # 1 week
+        Description: TTL of the message in seconds
+        Type: Number
+
+    MessageTTLAttribute:
+        Default: ttl
+        Description: TTL Attribute for the Message Table
+        Type: String
+
+    CORSAllowOrigin: 
+        Default: "*"
+        Description: Access-Control-Allow-Origin
+        Type: String
+        
+# More info about Globals: https://github.com/awslabs/serverless-application-model/blob/master/docs/globals.rst
+Globals:
+    Function:
+        Timeout: 3
+    Api:
+        Cors:
+            AllowMethods: "'GET,POST,OPTIONS'"
+            # Some browsers are case-sentitive on preflight CORS Headers
+            AllowHeaders: !Join
+                - ""
+                -   - "'"
+                    - "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token"
+                    - "content-type,x-amz-date,authorization,x-api-key,x-amz-security-token"
+                    - "'"
+            AllowOrigin: !Sub "'${CORSAllowOrigin}'"
+
+Resources:
+    KoiTableMessagesByPlace:
+        # TODO Enable TTL
+        # Pin Message to disable TTL
+        # List by Location
+        # Order by createdAt
+        Type: AWS::DynamoDB::Table
+        Properties:
+            TableName: !Ref MessagesByPlaceTableName
+            AttributeDefinitions:
+                - AttributeName: placeKey
+                  AttributeType: S
+                - AttributeName: sortKey
+                  AttributeType: S 
+            KeySchema:
+                - AttributeName: placeKey
+                  KeyType: HASH
+                - AttributeName: sortKey
+                  KeyType: RANGE
+            ProvisionedThroughput:
+                ReadCapacityUnits: 1
+                WriteCapacityUnits: 1
+            TimeToLiveSpecification:
+                AttributeName: !Ref MessageTTLAttribute
+                Enabled: true
+    # Beware:
+    # - Cognito is not available in all regions
+    # - No tools to migrate users and credentials
+    # KoiCognitoUserPool:
+    #     Type: AWS::Cognito::UserPool
+    #     Properties:
+    #         UserPoolName: KoiUserPool
+    KoiApi:
+        Type: AWS::Serverless::Api
+        Properties:
+            # EDGE is default but we don't want to pass by a cloudfront distrib for testing
+            EndpointConfiguration: REGIONAL 
+            # SAM automatically create a Stage named 'Stage' instead of renaming with your stage name
+            # Problems is related to immutability. If it is a real problem, dont use AWS::Serverless::Api resource
+            StageName: Dev
+            # Using Transform make the deployment quite slow
+            # Need to cp the yaml before running deploy or tweak package to auto upload and replace
+            DefinitionBody: 
+                'Fn::Transform':
+                    Name: 'AWS::Include'
+                    Parameters:            
+                        Location: s3://koi-api/swagger.yaml
+            # https://docs.aws.amazon.com/fr_fr/AWSCloudFormation/latest/UserGuide/aws-properties-apigateway-stage-methodsetting.html
+            # MethodSettings:
+            #     ThrottlingBurstLimit: No # TODO Set limit per users
+            #     ThrottlingRateLimit: No            
+            # Auth:
+            #     # If you want to use Cognito as AuthProvider
+            #     DefaultAuthorizer: KoiCognitoAuth # OPTIONAL
+            #     Authorizers:
+            #         KoiCognitoAuth:
+            #             UserPoolArn: !GetAtt KoiCognitoUserPool.Arn
+            #             Identity: # OPTIONAL
+            #                 Header: Authorization # OPTIONAL; Default: 'Authorization'
+
+    # Doing a mix between aws and aws_proxy integrations 
+    # Using aws => validators, cors generations, gateway responses
+    # Using aws_proxy => full access on event, context and responses
+    KoiFunction:
+        Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
+        Properties:
+            CodeUri: koi-api/
+            Handler: app.lambdaHandler
+            Runtime: nodejs8.10
+            # TODO Inject into ENV the CORS allowed domain
+            Environment:
+                Variables:
+                    KOI_MESSAGE_TABLE_NAME: !Ref MessagesByPlaceTableName
+                    KOI_MESSAGE_TABLE_TTL_ATTRIBUTE: !Ref MessageTTLAttribute
+                    KOI_MESSAGE_TTL: !Ref MessageTTL
+                    CORS_ALLOW_ORIGIN: !Ref CORSAllowOrigin
+            Policies:
+                # DynamoDB access, Lambda fail silencly if he doesnt have access to a cap
+                -
+                    Version: '2012-10-17' # Policy Document
+                    Statement:
+                        -
+                            Effect: Allow
+                            Action:
+                                - dynamodb:PutItem
+                                - dynamodb:DeleteItem
+                                - dynamodb:GetItem
+                                - dynamodb:Query
+                            Resource: !GetAtt KoiTableMessagesByPlace.Arn
+            Events:
+                getMessages:
+                    Type: Api
+                    Properties:
+                        RestApiId: !Ref KoiApi
+                        Path: /messages
+                        Method: GET
+                addMessage:
+                    Type: Api
+                    Properties:
+                        RestApiId: !Ref KoiApi
+                        Path: /messages
+                        Method: POST
+                        # Auth:
+                        #     Authorizer: Test
+    # TODO CloudFront distribution
+    # TODO Push app on s3
+
+Outputs:
+
+    KoiApi:
+      Description: "API Gateway endpoint URL for Dev stage for Koi function"
+      Value: !Sub 
+        - "https://${RestApiId}.execute-api.${AWS::Region}.amazonaws.com/${StageName}/"
+        - {'RestApiId': !Ref KoiApi, 'StageName': 'Dev' }
+
+    KoiFunction:
+      Description: "Koi Lambda Function ARN"
+      Value: !GetAtt KoiFunction.Arn
+
+    KoiFunctionIamRole:
+      Description: "Implicit IAM Role created for Koi function"
+      Value: !GetAtt KoiFunctionRole.Arn
+
+    KoiTableMessagesByPlace:
+      Description: "Koi Messages By Place Table"
+      Value: !GetAtt KoiTableMessagesByPlace.Arn

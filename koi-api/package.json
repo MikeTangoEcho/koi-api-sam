@@ -1,0 +1,20 @@
+{
+  "name": "koi-api",
+  "version": "1.0.0",
+  "description": "Koi API",
+  "main": "app.js",
+  "author": "MikeTangoEcho",
+  "license": "MIT",
+  "dependencies": {
+    "uuid": "^3.3.2"
+  },
+  "scripts": {
+    "test": "mocha tests/unit/"
+  },
+  "devDependencies": {
+    "aws-sdk-mock": "^4.3.0",
+    "chai": "^4.1.2",
+    "chai-string": "^1.5.0",
+    "mocha": "^5.1.1"
+  }
+}

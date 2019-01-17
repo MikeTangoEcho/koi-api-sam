@@ -1,0 +1,143 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'sam-app
+
+  Koi Chat application
+
+  '
+Globals:
+  Api:
+    Cors:
+      AllowHeaders:
+        Fn::Join:
+        - ''
+        - - ''''
+          - Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token
+          - content-type,x-amz-date,authorization,x-api-key,x-amz-security-token
+          - ''''
+      AllowMethods: '''GET,POST,OPTIONS'''
+      AllowOrigin:
+        Fn::Sub: '''${CORSAllowOrigin}'''
+  Function:
+    Timeout: 3
+Outputs:
+  KoiApi:
+    Description: API Gateway endpoint URL for Dev stage for Koi function
+    Value:
+      Fn::Sub:
+      - https://${RestApiId}.execute-api.${AWS::Region}.amazonaws.com/${StageName}/
+      - RestApiId:
+          Ref: KoiApi
+        StageName: Dev
+  KoiFunction:
+    Description: Koi Lambda Function ARN
+    Value:
+      Fn::GetAtt:
+      - KoiFunction
+      - Arn
+  KoiFunctionIamRole:
+    Description: Implicit IAM Role created for Koi function
+    Value:
+      Fn::GetAtt:
+      - KoiFunctionRole
+      - Arn
+  KoiTableMessagesByPlace:
+    Description: Koi Messages By Place Table
+    Value:
+      Fn::GetAtt:
+      - KoiTableMessagesByPlace
+      - Arn
+Parameters:
+  CORSAllowOrigin:
+    Default: '*'
+    Description: Access-Control-Allow-Origin
+    Type: String
+  MessageTTL:
+    Default: 604800
+    Description: TTL of the message in seconds
+    Type: Number
+  MessageTTLAttribute:
+    Default: ttl
+    Description: TTL Attribute for the Message Table
+    Type: String
+  MessagesByPlaceTableName:
+    Default: koiMessagesByPlace
+    Description: DynamoDB table name to store message
+    Type: String
+Resources:
+  KoiApi:
+    Properties:
+      DefinitionBody:
+        Fn::Transform:
+          Name: AWS::Include
+          Parameters:
+            Location: s3://koi-api/swagger.yaml
+      EndpointConfiguration: REGIONAL
+      StageName: Dev
+    Type: AWS::Serverless::Api
+  KoiFunction:
+    Properties:
+      CodeUri: s3://koi-api/20bb67c8db28d8f1af0c01d592fd25ed
+      Environment:
+        Variables:
+          CORS_ALLOW_ORIGIN:
+            Ref: CORSAllowOrigin
+          KOI_MESSAGE_TABLE_NAME:
+            Ref: MessagesByPlaceTableName
+          KOI_MESSAGE_TABLE_TTL_ATTRIBUTE:
+            Ref: MessageTTLAttribute
+          KOI_MESSAGE_TTL:
+            Ref: MessageTTL
+      Events:
+        addMessage:
+          Properties:
+            Method: POST
+            Path: /messages
+            RestApiId:
+              Ref: KoiApi
+          Type: Api
+        getMessages:
+          Properties:
+            Method: GET
+            Path: /messages
+            RestApiId:
+              Ref: KoiApi
+          Type: Api
+      Handler: app.lambdaHandler
+      Policies:
+      - Statement:
+        - Action:
+          - dynamodb:PutItem
+          - dynamodb:DeleteItem
+          - dynamodb:GetItem
+          - dynamodb:Query
+          Effect: Allow
+          Resource:
+            Fn::GetAtt:
+            - KoiTableMessagesByPlace
+            - Arn
+        Version: '2012-10-17'
+      Runtime: nodejs8.10
+    Type: AWS::Serverless::Function
+  KoiTableMessagesByPlace:
+    Properties:
+      AttributeDefinitions:
+      - AttributeName: placeKey
+        AttributeType: S
+      - AttributeName: sortKey
+        AttributeType: S
+      KeySchema:
+      - AttributeName: placeKey
+        KeyType: HASH
+      - AttributeName: sortKey
+        KeyType: RANGE
+      ProvisionedThroughput:
+        ReadCapacityUnits: 1
+        WriteCapacityUnits: 1
+      TableName:
+        Ref: MessagesByPlaceTableName
+      TimeToLiveSpecification:
+        AttributeName:
+          Ref: MessageTTLAttribute
+        Enabled: true
+    Type: AWS::DynamoDB::Table
+Transform: AWS::Serverless-2016-10-31

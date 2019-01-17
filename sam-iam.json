@@ -1,0 +1,103 @@
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "SamServerless",
+            "Effect": "Allow",
+            "Action": "cloudformation:CreateChangeSet",
+            "Resource": [
+                "arn:aws:cloudformation:*:aws:transform/Serverless-2016-10-31",
+                "arn:aws:cloudformation:*:aws:transform/Include"
+            ]
+        },
+        {
+            "Sid": "SamCloudformationSummary",
+            "Effect": "Allow",
+            "Action": [
+                "cloudformation:GetTemplateSummary"
+            ],
+            "Resource": [
+                "*"
+            ]
+        },
+        {
+            "Sid": "SamCloudformation",
+            "Effect": "Allow",
+            "Action": [
+                "cloudformation:*"
+            ],
+            "Resource": [
+                "arn:aws:cloudformation:*:*:stack/koi-api-stack/*",
+                "arn:aws:cloudformation:*:*:stackset/*:*"
+            ]
+        },
+        {
+            "Sid": "SamLambda",
+            "Effect": "Allow",
+            "Action": [
+				"lambda:*"
+			],
+			"Resource": [
+				"arn:aws:lambda:eu-west-3:*:function:*"
+			]
+        },
+        {
+            "Sid": "SamDynamoDB",
+            "Effect": "Allow",
+			"Action": [
+				"dynamodb:*"
+			],
+			"Resource": [
+				"arn:aws:dynamodb:*:*:table/*"
+			]
+        },
+        {
+            "Sid": "SamApiGateway",
+            "Effect": "Allow",
+			"Action": [
+				"apigateway:*"
+			],
+			"Resource": [
+				"arn:aws:apigateway:*::*"
+			]
+        },
+        {
+            "Sid": "SamS3",
+			"Effect": "Allow",
+            "Action": [
+				"s3:*"
+			],
+			"Resource": [
+                "arn:aws:s3:::koi-api",
+                "arn:aws:s3:::*/*"
+			]            
+        },
+        {
+            "Sid": "SamIamRole",
+			"Effect": "Allow",
+            "Action": [
+				"iam:GetRole",
+				"iam:CreateRole",
+				"iam:DeleteRole",
+				"iam:PutRolePolicy",
+				"iam:AttachRolePolicy",
+				"iam:DeleteRolePolicy",
+				"iam:DetachRolePolicy",
+                "iam:PassRole"
+			],
+			"Resource": [
+				"arn:aws:iam::*:role/*"
+			]
+		},
+		{
+            "Sid": "SamIamRolePolicy",
+			"Effect": "Allow",
+            "Action": [
+                "iam:ListPolicies"
+			],
+			"Resource": [
+				"arn:aws:iam::*:*"
+			]			
+		}
+    ]
+}
