@@ -8,6 +8,10 @@ Small API powered by AWS Serverless Application
 ├── koi-api                      <-- Source code for a lambda function
 │   ├── app.js                  <-- Lambda function code
 │   ├── package.json            <-- NodeJS dependencies
+│   ├── lib                     <-- Libs
+│   │    ├── config.js          <-- Handle configuration (can use dotenv)
+│   │    ├── repository.js      <-- Handle DynmaoDB integration           
+│   │    └── router.js          <-- Handle lambda event and content and return an http responses
 │   └── tests                   <-- Unit tests
 │       └── unit
 │           └── test_handler.js

@@ -1,14 +1,14 @@
 'use strict';
 
+var Config = require('./config');
 var Repository = require('./repository');
 
 var router = exports = module.exports = {};
 
-
 var buildResponse = function buildResponse(statusCode = 200, body = {}, headers = {}) {
     
     // Required for JS app with ApiGateway integration of type aws_proxy
-    headers['Access-Control-Allow-Origin'] = process.env.CORS_ALLOW_ORIGIN;
+    headers['Access-Control-Allow-Origin'] = Config().corsAllowOrigin;
 
     return {
         'statusCode': statusCode,

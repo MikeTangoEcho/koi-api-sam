@@ -8,9 +8,18 @@ var event, context;
 var AWS = require('aws-sdk-mock');
 
 describe('Tests Messages', function () {
+    const env = process.env;
+
+    beforeEach(function() {
+        process.env.KOI_MESSAGE_TABLE_NAME = 'mockTable';
+        process.env.KOI_MESSAGE_TABLE_TTL_ATTRIBUTE = 'ttl';
+        process.env.KOI_MESSAGE_TTL = 60;
+        process.env.CORS_ALLOW_ORIGIN = '*';
+    });
 
     afterEach(function() {
         AWS.restore();
+        process.env = env;
     });
     
     it('Add valid message', async () => {

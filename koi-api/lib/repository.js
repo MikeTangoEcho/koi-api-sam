@@ -1,16 +1,11 @@
 'use strict';
 
+var Config = require('./config');
 const uuidv4 = require('uuid/v4');
 var AWS = require('aws-sdk');
 // https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/DynamoDB.html
 
 var repository = exports = module.exports = {};
-
-
-//TODO Export to env/config from the LambdaFun
-const messageTableName = process.env.KOI_MESSAGE_TABLE_NAME;
-const messageTableTTLAttribute = process.env.KOI_MESSAGE_TABLE_TTL_ATTRIBUTE;
-const messageTTL = process.env.KOI_MESSAGE_TTL;
 
 var getPartitionKey = function (now, place) {
     return [now.getUTCFullYear(),
@@ -52,12 +47,13 @@ repository.addMessage  = async function (event, context) {
     };
 
     // Add TTL
-    if (messageTTL && messageTableTTLAttribute) {
-        item[messageTableTTLAttribute] = {N: Math.floor(now / 1000) + messageTTL};
+    if (Config().messageTTL && Config().messageTableTTLAttribute) {
+        item[Config().messageTableTTLAttribute] =
+            {N: (Math.floor(now / 1000) + Config().messageTTL).toString()};
     }
 
     var params = {
-        TableName: messageTableName,
+        TableName: Config().messageTableName,
         Item: item
     };
 
@@ -76,7 +72,7 @@ repository.getMessages = async function (event, context) {
     const placeKey = getPartitionKey(now, place);
 
     var params = {
-        TableName : messageTableName,
+        TableName : Config().messageTableName,
         ExpressionAttributeValues: {
             ':placeKey': placeKey
         },
